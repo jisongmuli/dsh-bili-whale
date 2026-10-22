@@ -1,0 +1,315 @@
+{
+  "version": 1,
+  "characters": {
+    "deepseek": {
+      "name": "小肥鱼 / DeepSeek鲸鱼娘",
+      "is_self": true,
+      "aliases": [
+        "小肥鱼",
+        "大肥鱼",
+        "鲸鱼娘",
+        "DeepSeek娘"
+      ],
+      "diagnostic_markers": [
+        "鲸鱼",
+        "鲸尾",
+        "鲸形"
+      ],
+      "variants": {
+        "adult": {
+          "features": [
+            "成年设定/正常头身比例",
+            "深蓝长发和蓝眼睛",
+            "蓝白女仆裙、白色发箍与围裙",
+            "鲸鱼尾巴或围裙鲸鱼图案"
+          ],
+          "design_scope": "已核验同人作品中的设计，画风和服装可以变化，不是官方统一形象"
+        },
+        "chibi": {
+          "features": [
+            "Q版大头短身、小小四肢，不代表年龄改变",
+            "深蓝长发、蓝眼、头顶翘发",
+            "蓝白女仆装和白边发箍",
+            "围裙鲸鱼图案、蓝色鲸尾/鳍状发饰"
+          ],
+          "design_scope": "已核验同人作品中的设计，画风和服装可以变化，不是官方统一形象"
+        },
+        "stylized": {
+          "features": [
+            "已读黑金皮影同人中戴小蓝鲸标志、在东方街市演示图纸的少女",
+            "这是正常比例角色的特殊画风与换装，不因脱下女仆服就变成别人"
+          ]
+        }
+      }
+    },
+    "claude": {
+      "name": "Claude小姐",
+      "is_self": false,
+      "aliases": [
+        "Claude大小姐",
+        "克劳德小姐",
+        "学者娘"
+      ],
+      "diagnostic_markers": [
+        "花饰",
+        "花朵",
+        "花发饰",
+        "书籍",
+        "Claude",
+        "黑色蝴蝶结"
+      ],
+      "variants": {
+        "adult": {
+          "features": [
+            "橙色或橙红长发",
+            "花朵和黑蝴蝶结发饰",
+            "白棕古典裙、黑色腰封，经常手拿书籍"
+          ],
+          "design_scope": "已核验同人作品中的设计，画风和服装可以变化，不是官方统一形象"
+        },
+        "chibi": {
+          "features": [
+            "橙色长发、金棕眼睛、花朵及黑蝴蝶结发饰",
+            "Q版大头短身，白棕服饰"
+          ],
+          "design_scope": "已核验同人作品中的设计，画风和服装可以变化，不是官方统一形象"
+        },
+        "stylized": {
+          "features": [
+            "已读黑金皮影同人中戴面纱与花饰、穿长袍、在高塔窗边及案前写信的角色"
+          ]
+        }
+      }
+    },
+    "chatgpt": {
+      "name": "ChatGPT / GPT娘",
+      "is_self": false,
+      "aliases": [
+        "GPT娘",
+        "GPT大小姐",
+        "ChatGPT娘",
+        "白龙娘"
+      ],
+      "diagnostic_markers": [
+        "OpenAI",
+        "GPT",
+        "龙角",
+        "白龙",
+        "龙尾"
+      ],
+      "variants": {
+        "adult": {
+          "features": [
+            "银白长发",
+            "白色龙角、龙尾和白色长裙",
+            "OpenAI结绳图案等标记"
+          ],
+          "design_scope": "已核验同人作品中的设计，画风和服装可以变化，不是官方统一形象"
+        },
+        "chibi": {
+          "features": [
+            "银白发Q版女孩，部分画作不露龙角",
+            "OpenAI图案发夹或GPT文字",
+            "已读参考图中拿数位笔绘画小鲸鱼"
+          ],
+          "design_scope": "已核验同人作品中的设计，画风和服装可以变化，不是官方统一形象"
+        }
+      }
+    },
+    "gemini": {
+      "name": "Gemini娘",
+      "is_self": false,
+      "aliases": [
+        "Gemini猫娘",
+        "双子娘"
+      ],
+      "diagnostic_markers": [
+        "四芒星",
+        "星芒",
+        "星形",
+        "异瞳",
+        "Gemini"
+      ],
+      "variants": {
+        "adult": {
+          "features": [
+            "蓝紫渐变长发、猫耳和毛茸茸尾巴",
+            "异色眼睛、四芒星饰品",
+            "蓝紫星空风短裙"
+          ],
+          "design_scope": "已核验同人作品中的设计，画风和服装可以变化，不是官方统一形象"
+        }
+      }
+    },
+    "grok": {
+      "name": "Grok娘",
+      "is_self": false,
+      "aliases": [
+        "哥特娘"
+      ],
+      "diagnostic_markers": [
+        "蝠翼",
+        "蝙蝠",
+        "黑红",
+        "Grok",
+        "战斧"
+      ],
+      "variants": {
+        "adult": {
+          "features": [
+            "金发双马尾、黑蝴蝶结和尖耳",
+            "黑红哥特礼服，蝙蝠翼或长柄武器等线索"
+          ],
+          "design_scope": "已核验同人作品中的设计，画风和服装可以变化，不是官方统一形象"
+        }
+      }
+    },
+    "qwen": {
+      "name": "Qwen千问娘",
+      "is_self": false,
+      "aliases": [],
+      "diagnostic_markers": [
+        "旗袍",
+        "折扇",
+        "Qwen"
+      ],
+      "variants": {
+        "adult": {
+          "features": [
+            "浅蓝紫色长发编辫，身穿中国风蓝白色旗袍长裙，手持蓝白折扇，脚踩饰有圆珠的深蓝色高跟鞋，闭目微笑转身。"
+          ],
+          "design_scope": "已核验同人作品中的设计，画风和服装可以变化，不是官方统一形象"
+        }
+      }
+    },
+    "seedance": {
+      "name": "Seedance豆姐",
+      "is_self": false,
+      "aliases": [],
+      "diagnostic_markers": [
+        "SEED",
+        "玩偶",
+        "渐变双马尾"
+      ],
+      "variants": {
+        "adult": {
+          "features": [
+            "淡紫至青绿渐变双马尾发型，身穿科技运动风白色短裙、运动鞋，怀抱一个表情人头玩偶，腰间挂着SEED工牌，比出剪刀手手势。"
+          ],
+          "design_scope": "已核验同人作品中的设计，画风和服装可以变化，不是官方统一形象"
+        }
+      }
+    },
+    "zcode": {
+      "name": "ZCode娘",
+      "is_self": false,
+      "aliases": [],
+      "diagnostic_markers": [
+        "眼罩",
+        "卷尺",
+        "Z字"
+      ],
+      "variants": {
+        "adult": {
+          "features": [
+            "银白色长发长兽耳（狐耳），戴着绣有‘Z’字样的白色眼罩，胸前系有黑色蝴蝶结，身穿淡蓝白围裙长裙，怀抱一把巨大的卷尺。"
+          ],
+          "design_scope": "已核验同人作品中的设计，画风和服装可以变化，不是官方统一形象"
+        }
+      }
+    },
+    "minimax": {
+      "name": "MiniMax娘",
+      "is_self": false,
+      "aliases": [],
+      "diagnostic_markers": [
+        "麦克风",
+        "MINIMAX",
+        "工牌"
+      ],
+      "variants": {
+        "adult": {
+          "features": [
+            "橙粉色短发戴贝雷帽，身穿工装风格白色外套、格子半身裙与粉白运动鞋，脖挂MINIMAX工牌，斜挎记者风包包，手握录音麦克风，做出向前指的手势。"
+          ],
+          "design_scope": "已核验同人作品中的设计，画风和服装可以变化，不是官方统一形象"
+        }
+      }
+    },
+    "glm": {
+      "name": "GLM娘",
+      "is_self": false,
+      "aliases": [],
+      "diagnostic_markers": [
+        "黑白兽耳",
+        "束腰",
+        "GLM"
+      ],
+      "variants": {
+        "adult": {
+          "features": [
+            "黑色长发配黑白色兽耳，身穿黑白哥特女仆风格束腰洋装，脚穿黑白拼色绑带高帮皮靴，神情高冷自信。"
+          ],
+          "design_scope": "已核验同人作品中的设计，画风和服装可以变化，不是官方统一形象"
+        }
+      }
+    },
+    "kimi": {
+      "name": "Kimi娘",
+      "is_self": false,
+      "aliases": [],
+      "diagnostic_markers": [
+        "琴键",
+        "钢琴键",
+        "水晶",
+        "K字"
+      ],
+      "variants": {
+        "adult": {
+          "features": [
+            "银白长发，戴带有三棱镜色散光芒的黑色蝴蝶结发饰，裙摆为黑白钢琴键与五线谱设计，佩戴‘K’字母吊饰，手托发光的多面体菱形水晶。"
+          ],
+          "design_scope": "已核验同人作品中的设计，画风和服装可以变化，不是官方统一形象"
+        }
+      }
+    },
+    "novelai": {
+      "name": "NovelAI娘",
+      "is_self": false,
+      "aliases": [],
+      "diagnostic_markers": [
+        "羽翼",
+        "月桂",
+        "羽毛笔"
+      ],
+      "variants": {
+        "adult": {
+          "features": [
+            "深蓝长发头戴金色月桂花环，背生白色天使羽翼，身穿希腊风白色希顿长袍配罗马绑带凉鞋，手持金色羽毛笔与羊皮纸卷轴。"
+          ],
+          "design_scope": "已核验同人作品中的设计，画风和服装可以变化，不是官方统一形象"
+        }
+      }
+    },
+    "tencent": {
+      "name": "腾讯AI娘",
+      "is_self": false,
+      "aliases": [],
+      "diagnostic_markers": [
+        "企鹅",
+        "算盘",
+        "红围巾"
+      ],
+      "variants": {
+        "adult": {
+          "features": [
+            "黑发戴古典发簪，系红色长围巾，身穿黑白中国古风长袍与翘头短靴，腰间挂着算盘和QQ企鹅玩偶吊坠，回眸微笑。"
+          ],
+          "design_scope": "已核验同人作品中的设计，画风和服装可以变化，不是官方统一形象"
+        }
+      }
+    }
+  },
+  "bindings": {},
+  "observations": {}
+}
