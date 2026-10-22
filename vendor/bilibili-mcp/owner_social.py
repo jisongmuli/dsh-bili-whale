@@ -105,7 +105,7 @@ async def act(credential,action,resource_key,rpid='',root='',text='',meme_id='',
             return {'success':False,'error':'只发表情图时配至多12字简短文字，不增加长篇正文'}
         if action=='comment' and requirement['required'] and re.search(r'几张|多张|[两二三23]张',tasks.command_text(incoming)):
             return {'success':False,'error':'本次需要多张图片，请用通用网页工具一次附足图片，不拆成多条文字或单图评论'}
-        if res.get('kind')=='video' and tasks.wants_video(incoming) and not task.get('media',{}).get(res.get('bvid'),{}).get('ok'):
+        if res.get('kind')=='video' and tasks.wants_video(incoming) and not tasks.video_evidence(task,res.get('bvid')):
             return {'success':False,'error':'观看后回复须先取得本视频的真实音画理解证据'}
     if action=='comment' and (c.contains_outbound_private_info(text) or len(text)>150 or (not text.strip() and not (meme_id or path))):
         return {'success':False,'error':'请提供150字以内的自然回复；图片可配简短文字，不含内部信息'}

@@ -43,13 +43,72 @@ def wants_video(item):
         return False
     if re.search(r'只(?:点赞|投币|收藏|关注)|不用看|不要看|不必看', text):
         return False
-    viewing=bool(re.search(r'去看|观看|看看|看一下|看下|看完|刷.{0,4}视频|看这个视频|看这[个条段]', text))
+    # Completed/attributive viewing describes a selection pool, not a new watch.
+    # Keep the remaining clause so "从看过的视频里选一个重新看" still requests viewing.
+    directive=re.sub(r'(?:观看|浏览|看|刷)(?:过|完|了)*(?=的)|(?:观看|浏览|看|刷)(?:过|了)', '', text)
+    viewing=bool(re.search(r'去看|观看|浏览|看看|看一下|看下|看完|重看|再看|看一[遍次]|刷.{0,4}视频|看这个视频|看这[个条段]', directive))
     media=bool(re.search(r'视频|BV[0-9A-Za-z]{10}|https?://(?:www\.)?bilibili\.com/video/|https?://b23\.tv/|《[^》]+》',text))
     current_video=bool(item.get('bvid') and re.fullmatch(r'\s*(?:你|请|帮我|去|来|先|再|一下|[，,\s])*(?:看看|看一下|看下|观看)(?:这[个段条]|那[个段条])?[。！!\s]*',text))
     if viewing and (media or current_video):
         return True
     bare_mention=item.get('kind')=='owner_mention' and item.get('mention_mode')!='conversation' and not text.strip()
     return bare_mention or bool(re.fullmatch(r'\s*(?:https?://[^\s\u3000-\u9fff，。！？]+|BV[0-9A-Za-z]{10}|《[^》]+》)\s*', text))
+
+def _actual_media_proof(data, bvid):
+    """Only actual audio/visual results count; titles, subtitles and sampler logs do not."""
+    if not isinstance(data,dict) or data.get('ok') is not True or data.get('bvid')!=bvid:
+        return None
+    if data.get('source') not in ('actual_video_and_audio','actual_sampled_video_and_audio'):
+        return None
+    analysis=data.get('analysis')
+    if not isinstance(analysis,dict):return None
+    visual=analysis.get('visual_observations')
+    audio=analysis.get('audio_observations')
+    # A genuinely silent video can have no audio observations.
+    if not isinstance(visual,list) or not any(isinstance(v,dict) and v.get('observation') for v in visual) or not isinstance(audio,list):
+        return None
+    at=data.get('analysed_at')
+    if isinstance(at,bool) or not isinstance(at,(int,float)) or not 0<at<=time.time()+60:
+        return None
+    return {'ok':True,'source':data['source'],'analysed_at':at,'validated':True}
+
+
+def video_evidence(task, bvid, allow_history=False):
+    """Use task-bound evidence for fresh viewing; validated durable evidence for history."""
+    if not re.fullmatch(r'BV[0-9A-Za-z]{10}',str(bvid)):return None
+    current=task.get('media',{}).get(bvid,{})
+    if current.get('ok') is True and current.get('validated') is True and current.get('source') in ('actual_video_and_audio','actual_sampled_video_and_audio'):
+        return current
+    if not allow_history or task.get('media_failures',{}).get(bvid):return None
+    # The conversation file selects the account home, including isolated test profiles.
+    try:files=(c.STATE_FILE.parent/'video-cache').glob(bvid+'-*.json')
+    except OSError:return None
+    best=None
+    try:
+        for file in files:
+            try:proof=_actual_media_proof(json.loads(file.read_text('utf-8')),bvid)
+            except (OSError,ValueError,TypeError):continue
+            if proof and (not best or proof['analysed_at']>best['analysed_at']):
+                best={**proof,'origin':'video-cache','file':file.name}
+    except OSError:pass
+    return best
+
+
+def verify_video_completion(task, incoming, text):
+    watching=wants_video(incoming)
+    claimed=bool(re.search(r'看完|已经看过|已经看了',text or ''))
+    if not (watching or claimed):return {'required':False,'ok':True}
+    targets=set(re.findall(r'BV[0-9A-Za-z]{10}',command_text(incoming)+'\n'+(text or '')))
+    # A notification's source video is only a target for an actual viewing request.
+    if not targets and watching and incoming.get('kind')=='owner_mention' and incoming.get('bvid'):
+        targets.add(incoming['bvid'])
+    if not targets:
+        targets.update(r.get('params',{}).get('bvid') for r in task.get('actions',{}).values()
+                       if r.get('status')=='success' and r.get('params',{}).get('bvid'))
+    if not targets:targets.update(task.get('media',{}))
+    proofs={bvid:proof for bvid in targets if (proof:=video_evidence(task,bvid,allow_history=not watching))}
+    return {'required':True,'watch_requested':watching,'ok':bool(targets) and targets.issubset(proofs),
+            'targets':sorted(targets),'proofs':proofs,'missing':sorted(targets-proofs.keys())}
 
 
 def image_delivery_requirement(state, task, incoming):
@@ -238,9 +297,12 @@ def record_tool(name, value=None, task_id=None, token=None):
         if name == 'bili_video_understand':
             try:
                 data = json.loads(value) if isinstance(value, str) else value
-                if data.get('ok') and data.get('bvid'):
-                    task.setdefault('media', {})[data['bvid']] = {'ok': True, 'source': data.get('source')}
+                proof=_actual_media_proof(data,data.get('bvid'))
+                if proof and data.get('bvid'):
+                    task.setdefault('media', {})[data['bvid']] = {**proof,'recorded_at':time.time()}
+                    task.setdefault('media_failures',{}).pop(data['bvid'],None)
                 elif data.get('bvid'):
+                    task.setdefault('media',{}).pop(data['bvid'],None)
                     task.setdefault('media_failures', {})[data['bvid']] = True
             except (ValueError, TypeError, AttributeError):
                 pass
@@ -444,12 +506,9 @@ async def dispatch(credential, mode='claim', task_id='', token='', trace='[]', c
             kind, text = 'failed', '主人，这次还没有核验到关注成功，不能只凭搜索结果算完成。'
         if kind == 'completed' and task.get('browser_run') and not task['browser_run'].get('success'):
             kind, text = 'failed', '主人，网页任务还没有取得完成确认，我保留了现有记录；不会重复提交或付款，需先核查浏览器状态。'
-        requested=set(re.findall(r'BV[0-9A-Za-z]{10}',command_text(incoming)))
-        if not requested and incoming.get('kind')=='owner_mention' and incoming.get('bvid'):
-            requested.add(incoming['bvid'])
-        understood=set(task.get('media',{}))
-        if (kind == 'completed' and (wants_video(incoming) or re.search(r'看完|已经看过|已经看了', text or ''))
-                and (not understood or not requested.issubset(understood))):
+        verification=verify_video_completion(task,incoming,text)
+        if verification['required']:task['media_verification']=verification
+        if kind == 'completed' and not verification['ok']:
             kind, text = 'failed', '主人，这次没有取得真实画面和音轨的理解结果，不能算已经看完视频；我保留了执行记录。'
         if not text:
             kind = 'failed'
@@ -836,7 +895,7 @@ async def action(credential, action, bvid='', uid='', rpid='', root='', text='',
             return {'success': False, 'image_required': True, 'error': '主人要求真实表情图，请从bili_meme_library选meme_id，传给本工具；[图名]只是文字，尚未发送'}
         if action == 'comment' and image_request['image_only'] and len(text.strip()) > 12:
             return {'success': False, 'image_required': True, 'error': '本条只需表情图配至多12字的简短文字/原生表情；也可text留空由已确认策略补“分享图片”。不要增加长篇正文，尚未发送'}
-        if action == 'comment' and (wants_video(incoming) or task.get('media_failures', {}).get(bvid)) and not task.get('media', {}).get(bvid, {}).get('ok'):
+        if action == 'comment' and (wants_video(incoming) or task.get('media_failures', {}).get(bvid)) and not video_evidence(task,bvid):
             return {'success': False, 'error': '尚未取得这个视频的实际画面与音轨分析，不能用字幕替代观看后发表观感；先完成视频理解，否则如实报告未完成'}
     if action == 'comment' and c.contains_outbound_private_info(text):
         return {'success': False, 'rewrite_required': True, 'error': '评论不能含内部控制词，请重写'}
