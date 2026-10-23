@@ -28,11 +28,19 @@ try{
         if((Get-Date) -gt $until){throw '任务仍在执行，暂未切换；可以稍后重试'}
         Start-Sleep -Seconds 2
     }
-    $routing=Read-Json (Join-Path $BiliHome 'model-routing.json')
-    $binary=$routing.antigravityCli
-    if(-not (Test-Path -LiteralPath $binary)){throw '找不到已配置的官方 Antigravity CLI'}
+    $node=Get-Command node.exe -ErrorAction SilentlyContinue
+    if($node){$nodePath=$node.Source}else{
+        $current=Get-CimInstance Win32_Process -Filter ('ProcessId='+(Read-Json (Join-Path $BiliHome 'runtime-status.json')).runtimePid)
+        $nodePath=Join-Path (Split-Path -Parent $current.ExecutablePath) 'resources/runtime/primary-runtime/dependencies/node/bin/node.exe'
+    }
+    $loginConfig=& $nodePath (Join-Path $PSScriptRoot '../lib/model-account-switch.mjs') --login-config $BiliHome | ConvertFrom-Json
+    if($LASTEXITCODE -ne 0 -or -not $loginConfig.binary){throw '找不到可用的官方 Antigravity CLI'}
+    $binary=$loginConfig.binary
     foreach($name in @('GEMINI_API_KEY','GOOGLE_API_KEY','AGY_ADC_AUTH','GOOGLE_GENAI_USE_VERTEXAI','GOOGLE_GEMINI_BASE_URL','NODE_USE_ENV_PROXY')){
         [Environment]::SetEnvironmentVariable($name,$null,'Process')
+    }
+    foreach($property in $loginConfig.env.PSObject.Properties){
+        [Environment]::SetEnvironmentVariable($property.Name,[string]$property.Value,'Process')
     }
     $settingsPath=Join-Path $env:USERPROFILE '.gemini/antigravity-cli/settings.json'
     [IO.Directory]::CreateDirectory((Split-Path -Parent $settingsPath)) | Out-Null
@@ -49,17 +57,13 @@ try{
     Read-Host '准备好后按回车打开官方 CLI' | Out-Null
     do{
         & $binary
+        if($LASTEXITCODE -ne 0){throw '官方 CLI 异常退出，登录未完成；不会将旧登录记为切换成功。请保留报错后重试。'}
         $answer=Read-Host '若已登录目标账号，按回车验证；输入 R 重新打开登录，输入 Q 取消'
     }while($answer -eq 'R')
     if($answer -eq 'Q'){return}
     $settings=Read-Json $settingsPath
     $settings | Add-Member -NotePropertyName useG1Credits -NotePropertyValue $false -Force
     [IO.File]::WriteAllText($settingsPath,($settings|ConvertTo-Json -Depth 30),(New-Object Text.UTF8Encoding($false)))
-    $node=Get-Command node.exe -ErrorAction SilentlyContinue
-    if($node){$nodePath=$node.Source}else{
-        $current=Get-CimInstance Win32_Process -Filter ('ProcessId='+(Read-Json (Join-Path $BiliHome 'runtime-status.json')).runtimePid)
-        $nodePath=Join-Path (Split-Path -Parent $current.ExecutablePath) 'resources/runtime/primary-runtime/dependencies/node/bin/node.exe'
-    }
     $verification=& $nodePath (Join-Path $PSScriptRoot '../lib/model-account-switch.mjs') --verify $BiliHome | ConvertFrom-Json
     if(-not $verification.success){throw ('登录验证未通过：'+$verification.code)}
     Request 'finish' @{verification=$verification} | Out-Null

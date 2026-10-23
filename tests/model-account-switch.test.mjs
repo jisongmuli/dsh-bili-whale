@@ -3,7 +3,7 @@ import assert from 'node:assert/strict'
 import {mkdtempSync,mkdirSync,writeFileSync,readFileSync,rmSync} from 'node:fs'
 import {join} from 'node:path'
 import {tmpdir} from 'node:os'
-const {createAccountSwitch,accountSwitchActive,verifyAccount}=await import(process.env.BILI_TEST_SWITCH_MODULE||new URL('../lib/model-account-switch.mjs',import.meta.url))
+const {createAccountSwitch,accountSwitchActive,verifyAccount,accountLoginConfig}=await import(process.env.BILI_TEST_SWITCH_MODULE||new URL('../lib/model-account-switch.mjs',import.meta.url))
 
 function fixture(t){
   const root=mkdtempSync(join(tmpdir(),'model-account-'));t.after(()=>rmSync(root,{recursive:true,force:true}))
@@ -71,4 +71,21 @@ test('verification uses the chosen configured Gemini model and no Bilibili tools
   assert.equal(result.success,true);assert.equal(calls,1)
   await assert.rejects(()=>verifyAccount(home,{assertSettings(){throw Error('credits enabled')},async runCli(){throw Error('must not run')}}),/credits enabled/)
   await assert.rejects(()=>verifyAccount(home,{assertSettings(){},async runCli(){return {model:'different',response:'OK'}}}),/VERIFICATION_FAILED/)
+})
+
+test('interactive login uses installed official CLI and the same local model network as background work',t=>{
+  const home=fixture(t),routing={primaryTransport:'antigravity-cli',antigravitySourceCli:join(home,'official cli.exe'),antigravityCli:join(home,'pinned.exe')}
+  writeFileSync(join(home,'model-routing.json'),JSON.stringify(routing))
+  writeFileSync(join(home,'network-settings.json'),JSON.stringify({proxy:{https:'http://127.0.0.1:18443'}}))
+  const installed=accountLoginConfig(home,{fileExists:()=>true})
+  assert.equal(installed.binary,routing.antigravitySourceCli)
+  assert.equal(installed.env.HTTPS_PROXY,'http://127.0.0.1:18443')
+  assert.equal('NODE_USE_ENV_PROXY' in installed.env,false)
+  assert.match(installed.env.NO_PROXY,/localhost/)
+  assert.equal(accountLoginConfig(home,{fileExists:path=>path===routing.antigravityCli}).binary,routing.antigravityCli)
+  assert.throws(()=>accountLoginConfig(home,{fileExists:()=>false}),/CLI_NOT_FOUND/)
+  writeFileSync(join(home,'network-settings.json'),JSON.stringify({proxy:{https:'https://outside.invalid:443'}}))
+  assert.deepEqual(accountLoginConfig(home,{fileExists:()=>true}).env,{})
+  writeFileSync(join(home,'model-routing.json'),JSON.stringify({primaryTransport:'api',antigravityCli:'unused'}))
+  assert.throws(()=>accountLoginConfig(home,{fileExists:()=>true}),/NOT_CONFIGURED/)
 })
