@@ -1188,6 +1188,7 @@ export function apply(ctx, config) {
       })
       const counts = readJson(join(stateDir, 'conversations.json'), {}).days?.[dayKey()] || {}
       writeJson(join(stateDir, 'runtime-status.json'), { ...readJson(join(stateDir, 'runtime-status.json'), {}), replyCheckAt: new Date().toISOString(), replyPollSeconds: 30, workers: activeWorkers(), queued: queue.queued, publicBlocked: queue.blocked || 0, publicPaused: queue.paused || 0, pausedCommentSections: queue.paused_resources || [], publicDeferred: queue.deferred || 0, publicPollErrors: queue.poll_errors || [], privateQueued: privateQueue.queued, privateBlocked: privateQueue.blocked || 0, privatePollErrors: privateQueue.poll_errors || [], repliesToday: counts.replies || 0, ownerRepliesToday: counts.owner_replies || 0, privateRepliesToday: counts.dm_replies || 0, ownerPrivateRepliesToday: counts.owner_dm_replies || 0, ownerUnlimited: true, replyDailyLimit: null, perNameDailyLimit: null, repliesUnlimited: true, schedule: '08:00–23:00，间隔30分钟，每轮1个视频' })
+      writeJson(join(stateDir, 'runtime-status.json'), { ...readJson(join(stateDir, 'runtime-status.json'), {}), publicPlatformBackoff: queue.platform_backoff || null })
       const next = [
         { why: 'reply-queue', item: queue?.pending?.[0] },
         { why: 'private-queue', item: privateQueue?.pending?.[0] },

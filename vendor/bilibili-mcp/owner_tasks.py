@@ -887,6 +887,8 @@ async def action(credential, action, bvid='', uid='', rpid='', root='', text='',
     with c.locked_state() as state:
         task, incoming = authorize(state, task_id, token)
         active_task_id = task['id']
+        from reply_publish import comment_backoff
+        if action=='comment' and (cooling:=comment_backoff(state)):return cooling
         image_request = comment_image_requirement(state, task, incoming)
         delivery = image_delivery_requirement(state, task, incoming)
         if action=='comment' and delivery['required'] and delivery['channel']=='private':

@@ -91,6 +91,8 @@ async def act(credential,action,resource_key,rpid='',root='',text='',meme_id='',
     with c.locked_state() as state:
         task,incoming=tasks.authorize(state)
         task_id,token=task['id'],task['token']
+        from reply_publish import comment_backoff
+        if action=='comment' and (cooling:=comment_backoff(state)):return cooling
         res=task.get('resources',{}).get(resource_key)
         if not res:return {'success':False,'error':'先用bili_owner_comments实际读取这个目标，不能猜资源编号'}
         parent=res['seen_comments'].get(str(rpid)) if rpid else None

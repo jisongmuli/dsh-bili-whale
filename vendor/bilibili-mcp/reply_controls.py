@@ -205,6 +205,8 @@ async def acknowledge(credential):
         return
     chosen = None
     with c.locked_state() as state:
+        from reply_publish import comment_backoff
+        if comment_backoff(state):return
         for event_id, event in state.get('reply_control_events', {}).items():
             ack = event.get('acknowledgement', {})
             if ack.get('status') == 'reserved' and ack.get('started_at', 0) < time.time() - 60:
@@ -238,7 +240,7 @@ async def acknowledge(credential):
         if current.get('source_id') != event['source_id']:
             saved['status'] = 'superseded'
             return
-        if c.budget_stop_reason():
+        if c.budget_stop_reason() or comment_backoff(state):
             saved['status'] = 'waiting'
             return
         saved['status'] = 'sending'
@@ -270,7 +272,10 @@ async def acknowledge(credential):
                 'comment_type':int(origin.get('comment_type',1)), 'text':ack['text'], 'control_ack':True}])[-20:]
     except (ReplyPaused, ResponseCodeException) as error:
         with c.locked_state() as state:
-            state['reply_control_events'][event_id]['acknowledgement'].update(status='failed', submitted=False,
+            from reply_publish import account_limited, record_comment_limit, CommentDeferred
+            limited=isinstance(error,ResponseCodeException) and account_limited(error.code,error.msg)
+            if limited and not isinstance(error,CommentDeferred):record_comment_limit(state,error.code,error.msg)
+            state['reply_control_events'][event_id]['acknowledgement'].update(status='waiting' if limited else 'failed', submitted=False,
                 error=type(error).__name__, finished_at=time.time())
     except Exception as error:
         with c.locked_state() as state:

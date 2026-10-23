@@ -371,6 +371,8 @@ async def pending_replies(credential, limit=10):
     ready,resources,retries,resource_errors=await resolve(credential,snapshot,notices+[{**n,'reply_time':n.get('at_time',0)} for n in mentions[0]])
     with locked_state() as state:
         known=state.setdefault('public_resources',{})
+        from reply_publish import recover_account_rejections, comment_backoff
+        recover_account_rejections(state)
         for key,value in resources.items():
             if value.get('checked_at',0)>=known.get(key,{}).get('checked_at',0):known[key]=value
         saved=state.setdefault('public_resource_retries',{})
@@ -410,6 +412,7 @@ async def pending_replies(credential, limit=10):
                 'replies_unlimited': True,
                 'owner_replies_today': counts['owner_replies'], 'recent_endings': recent_endings(state),
                 'poll_errors': [row[2] for row in (replies, mentions,recovered) if row[2]]+resource_errors}
+        output['platform_backoff']=comment_backoff(state)
     from reply_controls import acknowledge
     await acknowledge(credential)
     try:
@@ -481,6 +484,9 @@ async def send_guarded(bvid, text, rpid, root, credential, meme_id=None, owner_t
     reserve_video = not bool(rpid)
     name = None
     with locked_state() as state:
+        from reply_publish import comment_backoff
+        cooling=comment_backoff(state)
+        if cooling:return cooling
         counts = day_counts(state)
         if rpid:
             if not config.get('replyToComments') and not owner_task_id:
@@ -581,6 +587,8 @@ async def send_guarded(bvid, text, rpid, root, credential, meme_id=None, owner_t
         return receipt(control) if control else {'success': False, 'budget_stopped': True, 'error': stopped}
     try:
         from reply_controls import require_allowed
+        from reply_publish import require_public_send
+        require_public_send()
         require_allowed(aid, resource_type, text, root if rpid else None, rpid if rpid else None)
         sender = comment.send_comment
         forward_dynamic = config.get('mirrorDynamics') is True
@@ -608,7 +616,8 @@ async def send_guarded(bvid, text, rpid, root, credential, meme_id=None, owner_t
     except ResponseCodeException as error:
         target = await probe_reply_target(credential, aid, root, rpid, **({'comment_type':resource_type} if resource_type!=1 else {})) if rpid and error.code == 12022 else {'exists': None}
         message = str(error.msg or '')[:200]
-        global_backoff = error.code in (-412, -352) or bool(re.search(r'(?:操作|请求|发送).{0,8}频繁|验证码|稍后再试', message))
+        from reply_publish import account_limited, record_comment_limit, CommentDeferred
+        global_backoff = account_limited(error.code,message)
         with locked_state() as state:
             counts = state['days'][reservation_day]
             if rpid:
@@ -619,21 +628,22 @@ async def send_guarded(bvid, text, rpid, root, credential, meme_id=None, owner_t
                     counts['by_name'][name] -= 1
                 state['handled'].pop(str(rpid), None)
                 if not proactive:
-                    attempts = int(incoming.get('send_failures', 0)) + 1
+                    attempts = int(incoming.get('send_failures', 0)) + (0 if global_backoff else 1)
                     incoming.update(send_failures=attempts, last_send_error={'code':error.code,'message':message,'at':time.time()},
-                                    retry_after=time.time()+min(3600, 600*2**min(attempts-1, 3)))
+                                    retry_after=0 if global_backoff else time.time()+min(3600, 600*2**min(attempts-1, 3)))
                     if target.get('exists') is False:
                         incoming.update(blocked_reason='原评论已不可见，保留记录并停止对此目标自动重试', target_probe=target)
-                    elif attempts >= 3:
+                    elif not global_backoff and attempts >= 3:
                         incoming['blocked_reason'] = '同一目标连续被拒，保留记录等待核查，不阻塞其他来信'
                     state['pending'][str(rpid)] = incoming
             if reserve_video:
                 counts['videos'].remove(bvid)
                 state['video_attempts'].pop(bvid, None)
             if global_backoff:
-                state['public_reply_retry_after'] = time.time()+300
+                if not isinstance(error,CommentDeferred):record_comment_limit(state,error.code,message)
         skip = target.get('exists') is False and not global_backoff
         return {'success': False, 'code': error.code, 'error': message or 'B站拒绝此条评论',
+                'platform_limited':global_backoff,'retry_at':state.get('public_reply_retry_after') if global_backoff else incoming.get('retry_after') if incoming else None,
                 'skip_target': skip, 'continue_queue': skip, 'stop_round': not skip,
                 'target_unavailable': target.get('exists') is False,
                 'message': '仅隔离失效目标，可继续其他来信；不得重发该条' if skip else '当前批次停止发送，失败目标已记录退避，不能立即重发'}
@@ -643,6 +653,8 @@ async def send_guarded(bvid, text, rpid, root, credential, meme_id=None, owner_t
     if not sent_id.isdigit():
         return {'success': False, 'error': 'Comment receipt had no ID; do not resend automatically'}
     with locked_state() as state:
+        from reply_publish import record_comment_success
+        record_comment_success(state)
         state['last_sent_at'] = time.time()
         if rpid:
             state['handled'][str(rpid)] = {'reply': sent_id, 'day': reservation_day, 'name': incoming['name'], 'owner': owner}
