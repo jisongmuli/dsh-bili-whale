@@ -2,7 +2,7 @@ import {readdirSync,readFileSync,statSync} from 'node:fs'
 import {join,relative} from 'node:path'
 import {fileURLToPath} from 'node:url'
 const root=fileURLToPath(new URL('..',import.meta.url));let count=0;const issues=[]
-const runtimeNames=new Set(['bili_credential.json','conversations.json','persona-state.json','cost-ledger.json','identity.json','installation.json','owner-watch-history.json','network-settings.json'])
+const runtimeNames=new Set(['bili_credential.json','conversations.json','persona-state.json','cost-ledger.json','identity.json','installation.json','owner-watch-history.json','network-settings.json','model-account-switch.json'])
 function walk(dir){for(const entry of readdirSync(dir,{withFileTypes:true})){
  if(['.git','node_modules','.test-output','__pycache__'].includes(entry.name))continue
  const file=join(dir,entry.name),name=relative(root,file).replaceAll('\\','/')

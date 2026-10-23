@@ -1,6 +1,6 @@
 {
   "name": "dsh-bili-scroll",
-  "version": "0.2.2",
+  "version": "0.3.0",
   "description": "DeepSeek Harness 鲸鱼娘：B站评论与私信、真实音画理解、持久记忆和通用任务智能体",
   "keywords": [
     "dsh",
@@ -43,7 +43,8 @@
     "NOTICE.md",
     "安装.cmd",
     "检查环境.cmd",
-    "登录模型.cmd"
+    "登录模型.cmd",
+    "切换模型账号.cmd"
   ],
   "engines": {
     "dsh": ">=0.1.7-rc.1",

@@ -29,3 +29,4 @@ owner-browser-jobs/
 antigravity-jobs/
 .gemini/
 .env*
+**/model-account-switch.json

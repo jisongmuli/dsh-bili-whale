@@ -40,6 +40,7 @@ import { modelNetworkEnv } from './lib/network-env.mjs'
 import { runOwnerCheckin } from './lib/owner-checkins.mjs'
 import { stopDutyTree } from './lib/antigravity-duty.mjs'
 import { runOwnerAssistant, ownerTools } from './lib/owner-assistant.mjs'
+import { accountSwitchActive, createAccountSwitch } from './lib/model-account-switch.mjs'
 
 export const name = 'bili-scroll'
 export const inject = ['webServer', 'tools', 'settings']
@@ -937,6 +938,7 @@ export function apply(ctx, config) {
   const stopAllDuty = () => { stopDutyTree(runningDuty); for (const child of Object.values(runningReplies)) stopDutyTree(child); checkinRunning?.abort() }
   const runDuty = (why = 'window') => {
    try {
+    if(accountSwitchActive(stateDir))return {started:false,deferred:true,accountSwitch:true,hint:'正在手动切换Gemini账号，任务和消息保留，完成后继续'}
     const lane = why === 'private-queue' ? 'private' : why === 'reply-queue' ? 'replies' : 'browse'
     if (lane === 'browse' ? runningDuty : runningReplies[lane]) return { started: false, busy: true, why }
     const retry=workerRetry(lane)
@@ -1064,8 +1066,9 @@ export function apply(ctx, config) {
   const replyPrompt = () => buildReplyPrompt(stateDir)
 
   let ownerRunning = null, checkingOwner = false
+  const modelAccounts=createAccountSwitch(stateDir,{busy:()=>Boolean(runningDuty||Object.values(runningReplies).some(Boolean)||ownerRunning||checkingOwner||checkinRunning||budgetStatus(stateDir).reservedCny>0)})
   const ownerTick = async () => {
-    if (checkingOwner || ownerRunning) return
+    if (checkingOwner || ownerRunning || accountSwitchActive(stateDir)) return
     checkingOwner = true
     try {
       refreshCfg()
@@ -1125,6 +1128,7 @@ export function apply(ctx, config) {
 
   const tick = () => {
     try {
+      if(accountSwitchActive(stateDir))return
       refreshCfg()
       if (drainManualQueue().started) return
       writeJson(join(stateDir, 'runtime-status.json'), { ...readJson(join(stateDir, 'runtime-status.json'), {}), browseTickAt: new Date().toISOString(), browseEnabled: cfg.peakValley })
@@ -1143,7 +1147,7 @@ export function apply(ctx, config) {
 
   let checkingHistory = false
   const checkinTick = async () => {
-    if(checkinRunning || ownerRunning || !hasCredential())return
+    if(checkinRunning || ownerRunning || !hasCredential() || accountSwitchActive(stateDir))return
     const settings=readJson(join(stateDir,'owner-checkins-settings.json'),{})
     if(settings.enabled!==true || !cfg.replyToPrivateMessages || budgetStatus(stateDir).stopped)return
     const controller=new AbortController();checkinRunning=controller
@@ -1189,6 +1193,7 @@ export function apply(ctx, config) {
       const counts = readJson(join(stateDir, 'conversations.json'), {}).days?.[dayKey()] || {}
       writeJson(join(stateDir, 'runtime-status.json'), { ...readJson(join(stateDir, 'runtime-status.json'), {}), replyCheckAt: new Date().toISOString(), replyPollSeconds: 30, workers: activeWorkers(), queued: queue.queued, publicBlocked: queue.blocked || 0, publicPaused: queue.paused || 0, pausedCommentSections: queue.paused_resources || [], publicDeferred: queue.deferred || 0, publicPollErrors: queue.poll_errors || [], privateQueued: privateQueue.queued, privateBlocked: privateQueue.blocked || 0, privatePollErrors: privateQueue.poll_errors || [], repliesToday: counts.replies || 0, ownerRepliesToday: counts.owner_replies || 0, privateRepliesToday: counts.dm_replies || 0, ownerPrivateRepliesToday: counts.owner_dm_replies || 0, ownerUnlimited: true, replyDailyLimit: null, perNameDailyLimit: null, repliesUnlimited: true, schedule: '08:00–23:00，间隔30分钟，每轮1个视频' })
       writeJson(join(stateDir, 'runtime-status.json'), { ...readJson(join(stateDir, 'runtime-status.json'), {}), publicPlatformBackoff: queue.platform_backoff || null })
+      if(accountSwitchActive(stateDir))return
       const next = [
         { why: 'reply-queue', item: queue?.pending?.[0] },
         { why: 'private-queue', item: privateQueue?.pending?.[0] },
@@ -1534,6 +1539,7 @@ export function apply(ctx, config) {
       ownerCheckins: { ...readJson(join(stateDir,'owner-checkins-settings.json'),{}), ...readJson(join(stateDir,'owner-checkins-status.json'),{}), running:Boolean(checkinRunning), independentOfReplies:true },
       ownerTasks: { enabled: Boolean(cfg.ownerTaskEnabled), prefix: '主人命令：', biliPrefixRequired: false, computerPrefixRequired: false, presetFirst:true, unknownGoals:'agent', ownerUid: identity(stateDir).ownerUid, channels: ['private', 'comment', 'mention'], running: Boolean(ownerRunning), pollSeconds: 30, coins: 'allowed', money: 'confirm_first' },
       modelRouting: { ...readJson(join(stateDir, 'model-routing.json'), {}), status: readJson(join(stateDir, 'model-router-status.json'), {}), workers: Object.fromEntries(['browse','replies','private'].map(kind => [kind,readJson(join(stateDir,`model-router-status-${kind}.json`),{})])) },
+      modelAccountSwitch: modelAccounts.status(),
       installFailed: !installing && !venvReadyNow() && (() => { try { return readFileSync(installLogFile, 'utf8').length > 0 } catch { return false } })(),
       installing,
       // ── 本地转写那一套的状态（设置页要显示进度）──
@@ -1555,6 +1561,32 @@ export function apply(ctx, config) {
     refreshCfg()
     const path = url.pathname
     if (req.method === 'GET' && path === '/api/bili-duty/status') return sendJson(res, 200, status())
+
+    if(req.method==='POST'&&path==='/api/bili-duty/model-account'){
+      try{
+        const body=await readBody(req)
+        if(body.operation==='begin')return sendJson(res,200,modelAccounts.begin())
+        if(body.operation==='ready')return sendJson(res,200,modelAccounts.ready(body.id,body.token))
+        if(body.operation==='finish')return sendJson(res,200,modelAccounts.finish(body.id,body.token,body.verification))
+        if(body.operation==='cancel')return sendJson(res,200,modelAccounts.cancel(body.id,body.token))
+        if(body.operation==='closed-window')return sendJson(res,200,modelAccounts.releaseClosedWindow())
+        if(body.operation==='launch'){
+          const session=modelAccounts.begin()
+          if(!session.started)return sendJson(res,200,{...modelAccounts.status(),started:false})
+          const script=fileURLToPath(new URL('./scripts/Switch-Model.ps1',import.meta.url))
+          const args=['-NoProfile','-ExecutionPolicy','Bypass','-File',script,'-BiliHome',stateDir,'-BaseUrl',`http://127.0.0.1:${req.socket.localPort}`,'-SessionId',session.id,'-Token',session.token]
+          const argumentLine=args.map(v=>'"'+String(v).replaceAll('"','""')+'"').join(' ')
+          const command="Start-Process -FilePath 'powershell.exe' -WindowStyle Normal -ArgumentList '"+argumentLine.replaceAll("'","''")+"'"
+          try{
+            const child=spawn('powershell.exe',['-NoProfile','-Command',command],{windowsHide:true,stdio:'ignore',shell:false})
+            child.once('error',()=>{try{modelAccounts.cancel(session.id,session.token)}catch{}})
+            child.once('exit',code=>{if(code!==0)try{modelAccounts.cancel(session.id,session.token)}catch{}})
+          }catch(error){modelAccounts.cancel(session.id,session.token);throw error}
+          return sendJson(res,200,{...modelAccounts.status(),started:true})
+        }
+        return sendJson(res,400,{error:'UNKNOWN_MODEL_ACCOUNT_OPERATION'})
+      }catch(error){return sendJson(res,400,{error:error.message||'MODEL_ACCOUNT_SWITCH_FAILED'})}
+    }
 
     if (req.method === 'GET' && path === '/api/bili-duty/config') {
       return sendJson(res, 200, { ok: true, config: cfg, windows: WINDOWS, home: stateDir })

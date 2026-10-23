@@ -347,6 +347,26 @@ window.__ModuleLoader__.load({
         await patch({ keywords: list, workspace: String(ws || '').trim() }, '关键词与工作区')
       }
 
+      const onSwitchModelAccount=async()=>{
+        setBusy('model-account')
+        try{
+          const result=await jpost('/model-account',{operation:'launch'})
+          if(result.error)throw Error(result.error)
+          setSt(old=>({...old,modelAccountSwitch:result}))
+          say(result.started?'账号切换窗口已打开：等待当前任务结束后，按窗口提示选择Google账号并验证。':'已有账号切换窗口，请先完成该窗口。','good')
+        }catch(error){say(String(error.message||error),'warn')}
+        finally{setBusy('')}
+      }
+
+      const onReleaseModelSwitch=async()=>{
+        try{
+          const result=await jpost('/model-account',{operation:'closed-window'})
+          if(result.error)throw Error(result.error)
+          setSt(old=>({...old,modelAccountSwitch:result}))
+          say('已结束切换等待，任务恢复；后续请求沿用官方CLI当前的登录。','good')
+        }catch(error){say(String(error.message||error),'warn')}
+      }
+
       if (!cfg) {
         return h('div', { 'data-bd-page': '' }, h('div', { 'data-bd-note': '' }, '读设置中…'))
       }
@@ -367,6 +387,11 @@ window.__ModuleLoader__.load({
             'data-warn': runNote.tone === 'warn' ? '' : undefined }, runNote.t) : null,
           h('div', { 'data-bd-note': '' }, `${st.modelRouting?.primaryTransport === 'antigravity-cli' ? '官方Antigravity CLI使用本人的账号权限；本地不设次数上限，远端配额取决于账号。超额积分保持关闭，DeepSeek失败后备每日最多2元。' : st.budget?.freePrimary ? 'Gemini 3.8 Flash使用免费额度，不限制调用次数；DeepSeek失败后备每日最多2元。' : '每日费用上限2元。'}已记账${Number(st.budget?.spentCny || 0).toFixed(3)}元，已预留${Number(st.budget?.reservedCny || 0).toFixed(3)}元。${st.budget?.stopped ? '任务已停止：' + (st.budget.reason || '预算不足') : st.budget?.fallbackStopped ? '付费后备已停止，Gemini订阅入口仍可继续。' : '请求失败才使用后备，原有费用账本持续保留。'}`),
           h('div', { 'data-bd-note': '' }, st.ownerHistory?.loggedIn ? '主账号历史已授权' : '主账号历史待授权；请在下方点“授权主人观看历史”'),
+
+          st.modelRouting?.primaryTransport==='antigravity-cli'?h('div',{'data-bd-row':''},
+            h('button',{'data-bd-btn':'',disabled:busy==='model-account'||st.modelAccountSwitch?.active,onClick:onSwitchModelAccount},'切换 Gemini 账号'),
+            st.modelAccountSwitch?.active?h('button',{'data-bd-btn':'',onClick:onReleaseModelSwitch},'窗口已关闭，恢复任务'):null,
+            h('span',{'data-bd-note':''},st.modelAccountSwitch?.active?'正在等待任务结束或登录；消息保留，完成后继续。':st.modelAccountSwitch?.phase==='completed'?'上次登录验证通过；当前账号以官方CLI窗口为准。':'需要时手动切换，在官方窗口核对账号；超额积分保持关闭。')):null,
 
         /* ── 定时 ── */
         h('div', { 'data-bd-sec': '' },
