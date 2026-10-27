@@ -6,6 +6,18 @@ $failed=0
 function Check([string]$Label,[bool]$Passed){if($Passed){Write-Host ('[OK] '+$Label)}else{Write-Host ('[待处理] '+$Label);$script:failed++}}
 function ReadJson([string]$Name){$path=Join-Path $botHome $Name;if(Test-Path -LiteralPath $path){return Get-Content -LiteralPath $path -Raw|ConvertFrom-Json};return $null}
 $identity=ReadJson 'identity.json';$install=ReadJson 'installation.json';$routing=ReadJson 'model-routing.json'
+$profile=Join-Path $DshHome 'profiles/desktop/package.json'
+$manifest=if(Test-Path -LiteralPath $profile){Get-Content -LiteralPath $profile -Raw | ConvertFrom-Json}else{$null}
+$registered=$manifest -and ('dsh-bili-scroll' -in @($manifest.dsh.profile.bundles))
+Check '桌面插件已登记' ([bool]$registered)
+if(-not $registered){Write-Host '安装目录存在但桌面插件未登记；关闭宿主后重跑安装.cmd恢复登记。'}
+$runtime=ReadJson 'runtime-status.json';$lifecycle=ReadJson 'runtime-host.lifecycle.json'
+$process=if($runtime.runtimePid){Get-Process -Id $runtime.runtimePid -ErrorAction SilentlyContinue}else{$null}
+$fresh=$false
+if($runtime.replyTickAt){try{$fresh=([datetime]::UtcNow-([datetime]$runtime.replyTickAt).ToUniversalTime()).TotalSeconds -lt 90}catch{}}
+$sameProcess=$false
+if($process -and $runtime.startedAt){try{$sameProcess=$process.StartTime.ToUniversalTime() -le ([datetime]$runtime.startedAt).ToUniversalTime().AddSeconds(2)}catch{}}
+Check '后台进程与心跳有效' ([bool]($registered -and $process -and $sameProcess -and $fresh -and (-not $lifecycle -or $lifecycle.phase -eq 'active')))
 Check '两个不同账号已绑定' ($identity.ownerUid -match '^[1-9][0-9]*$' -and $identity.botUid -match '^[1-9][0-9]*$' -and $identity.ownerUid -ne $identity.botUid)
 Check '宿主程序与可移植启动器' ($install -and (Test-Path -LiteralPath $install.appPath) -and (Test-Path -LiteralPath (Join-Path $botHome 'desktop-dsh.cjs')))
 Check 'Antigravity CLI' ($routing -and (Test-Path -LiteralPath $routing.antigravityCli))

@@ -271,11 +271,11 @@ def select(state, limit=10):
             'shared_daily_limit': c.DAILY_REPLY_LIMIT, 'per_name_daily_limit': c.PER_NAME_REPLY_LIMIT}
 
 
-async def pending_private_messages(credential, limit=10):
+async def pending_private_messages(credential, limit=10, refresh=True):
     if not enabled():
         return {'pending': [], 'queued': 0, 'disabled': True}
-    errors = await poll(credential)
-    with c.locked_state() as state:
+    errors = await poll(credential) if refresh else []
+    with c.locked_state(read_only=True) as state:
         return {**select(state, limit), 'poll_errors': errors}
 
 

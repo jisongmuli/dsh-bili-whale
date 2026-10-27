@@ -29,6 +29,7 @@ import { appendFileSync, existsSync, mkdirSync, readdirSync, readFileSync, renam
 import { join, dirname } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { McpClient } from './lib/mcp.mjs'
+import { claimRuntime } from './lib/runtime-lease.mjs'
 import { verifyRecent, appendVerifyToReport } from './lib/verify.mjs'
 import { WINDOWS, stateDirOf, readJson, writeJson, ensureHomeFiles, ensureCharter, charterPath, inWindow, dayKey } from './lib/state.mjs'
 import { loginStart, loginPoll, saveCredential, saveOwnerHistoryCredential, renderQrPng } from './lib/login.mjs'
@@ -126,6 +127,9 @@ export function apply(ctx, config) {
     return myVer
   }
   const stateDir = stateDirOf(ctx)
+  const releaseRuntime=claimRuntime(stateDir)
+  if(!releaseRuntime){ctx.logger?.info?.('[bili-duty] 当前账号后台已运行，跳过重复启动');return}
+  ctx.effect(()=>releaseRuntime,'bili-duty: 单账号运行租约')
 
   // ⭐ "就绪"必须检查依赖真的装上了，不能只看目录存不存在
   //    （2026-10-15：只看目录，害一位真实用户"显示就绪但其实装失败"白折腾 ✗）

@@ -56,7 +56,7 @@ def save_state(state):
 
 
 @contextmanager
-def locked_state():
+def locked_state(read_only=False):
     STATE_FILE.parent.mkdir(parents=True, exist_ok=True)
     lock = STATE_FILE.with_suffix('.lock').open('a+b')
     if lock.tell() == 0:
@@ -80,7 +80,7 @@ def locked_state():
     try:
         state = read_json(STATE_FILE, new_state())
         yield state
-        save_state(state)
+        if not read_only:save_state(state)
     finally:
         lock.seek(0)
         if os.name == 'nt':
@@ -362,8 +362,8 @@ async def scan_notifications(credential, snapshot, stream, enabled=True):
 
 async def pending_replies(credential, limit=10):
     from public_inbox import backfill, resolve
-    with locked_state() as state:
-        snapshot = json.loads(json.dumps(state))
+    with locked_state(read_only=True) as state:
+        snapshot = state
     replies, mentions, recovered = await asyncio.gather(
         scan_notifications(credential, snapshot, 'reply'),
         scan_notifications(credential, snapshot, 'at'),backfill(credential,snapshot))
